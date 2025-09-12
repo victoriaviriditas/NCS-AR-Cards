@@ -1,26 +1,152 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>NCS AR Test – 3D Cube</title>
+    <title>NCS AR – Photo Cube (Drag to Spin)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- A-Frame + AR.js -->
     <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
     <script src="https://cdn.rawgit.com/jeromeetienne/ar.js/2.2.1/aframe/build/aframe-ar.min.js"></script>
     <style>
-      body { margin: 0; overflow: hidden; }
-      a-scene { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+      body { margin:0; overflow:hidden; }
+      a-scene { position: absolute; inset: 0; touch-action: none; } /* prevent browser gestures */
     </style>
+
+    <!-- Drag / Flick rotation component -->
+    <script>
+      AFRAME.registerComponent('spin-drag', {
+        schema: {
+          sensitivity: {default: 0.4}, // higher = faster response to finger movement
+          inertia: {default: 0.95}     // 0.90 (more glide) … 0.99 (very long glide)
+        },
+        init: function () {
+          this.dragging = false;
+          this.prev = null;
+          this.vel = {x: 0, y: 0}; // last-frame velocity (px per frame)
+
+          // Bind methods so we can add/remove listeners
+          this.onDown = this.onDown.bind(this);
+          this.onMove = this.onMove.bind(this);
+          this.onUp   = this.onUp.bind(this);
+
+          // Listen on the canvas (exists after scene loads)
+          this.el.sceneEl.addEventListener('loaded', () => {
+            const canvas = this.el.sceneEl.canvas;
+            // Mouse
+            canvas.addEventListener('mousedown', this.onDown, {passive:false});
+            window.addEventListener('mousemove', this.onMove, {passive:false});
+            window.addEventListener('mouseup', this.onUp, {passive:false});
+            // Touch
+            canvas.addEventListener('touchstart', this.onDown, {passive:false});
+            window.addEventListener('touchmove', this.onMove, {passive:false});
+            window.addEventListener('touchend', this.onUp, {passive:false});
+            window.addEventListener('touchcancel', this.onUp, {passive:false});
+          });
+        },
+        remove: function () {
+          const canvas = this.el.sceneEl && this.el.sceneEl.canvas;
+          if (!canvas) return;
+          canvas.removeEventListener('mousedown', this.onDown);
+          window.removeEventListener('mousemove', this.onMove);
+          window.removeEventListener('mouseup', this.onUp);
+          canvas.removeEventListener('touchstart', this.onDown);
+          window.removeEventListener('touchmove', this.onMove);
+          window.removeEventListener('touchend', this.onUp);
+          window.removeEventListener('touchcancel', this.onUp);
+        },
+        getPoint: function (e) {
+          if (e.touches && e.touches.length) {
+            return {x: e.touches[0].clientX, y: e.touches[0].clientY};
+          }
+          return {x: e.clientX, y: e.clientY};
+        },
+        onDown: function (e) {
+          e.preventDefault();
+          this.dragging = true;
+          this.prev = this.getPoint(e);
+          // stop any existing spin immediately when the user grabs it
+          this.vel.x = 0; this.vel.y = 0;
+        },
+        onMove: function (e) {
+          if (!this.dragging) return;
+          e.preventDefault();
+          const p = this.getPoint(e);
+          const dx = p.x - this.prev.x;
+          const dy = p.y - this.prev.y;
+          this.prev = p;
+
+          // Save velocity for inertia (px per ~frame)
+          this.vel.x = dx;
+          this.vel.y = dy;
+
+          // Apply rotation instantly while dragging
+          this.rotateBy(dx, dy);
+        },
+        onUp: function () {
+          this.dragging = false;
+          this.prev = null;
+          // when released, inertia will keep applying vel in tick()
+        },
+        rotateBy: function (dx, dy) {
+          const rot = this.el.getAttribute('rotation');
+          // Horizontal drag -> spin around Y; Vertical drag -> tilt around X
+          rot.y += dx * this.data.sensitivity;
+          rot.x += dy * this.data.sensitivity;
+          this.el.setAttribute('rotation', rot);
+        },
+        tick: function (time, dt) {
+          // keep spinning with inertia when not dragging
+          if (this.dragging) return;
+          if (dt == null) dt = 16;
+
+          // scale velocity to frame time so it feels similar across devices
+          const scale = dt / 16;
+          if (Math.abs(this.vel.x) > 0.01 || Math.abs(this.vel.y) > 0.01) {
+            this.rotateBy(this.vel.x * scale, this.vel.y * scale);
+            this.vel.x *= this.data.inertia;
+            this.vel.y *= this.data.inertia;
+          }
+        }
+      });
+    </script>
   </head>
+
   <body>
     <a-scene embedded arjs>
+      <!-- Preload your images -->
+      <a-assets>
+        <img id="hirowife"   src="img/hirowife.png"   crossorigin="anonymous" />
+        <img id="hirosquire" src="img/hirosquire.png" crossorigin="anonymous" />
+        <img id="hiroknight" src="img/hiroknight.png" crossorigin="anonymous" />
+        <img id="hirofriar"  src="img/hirofriar.png"  crossorigin="anonymous" />
+        <img id="hirobottom" src="img/hirobottom.png" crossorigin="anonymous" />
+        <img id="hirotitle"  src="img/hirotitle.png"  crossorigin="anonymous" />
+      </a-assets>
+
+      <!-- Marker -->
       <a-marker preset="hiro">
-        <a-box 
-          position="0 0.5 0" 
-          rotation="0 45 0" 
-          color="#FFC65D" 
-          depth="1" 
-          height="1" 
-          width="1">
-        </a-box>
+        <!-- Photo cube: now rotated by user via spin-drag -->
+        <a-entity id="photo-cube" position="0 0.5 0" spin-drag>
+          <!-- FRONT (+Z) -->
+          <a-plane width="1" height="1" position="0 0 0.5" rotation="0 0 0"
+                   material="src: #hirowife"></a-plane>
+          <!-- BACK (-Z) -->
+          <a-plane width="1" height="1" position="0 0 -0.5" rotation="0 180 0"
+                   material="src: #hirosquire"></a-plane>
+          <!-- RIGHT (+X) -->
+          <a-plane width="1" height="1" position="0.5 0 0" rotation="0 -90 0"
+                   material="src: #hiroknight"></a-plane>
+          <!-- LEFT (-X) -->
+          <a-plane width="1" height="1" position="-0.5 0 0" rotation="0 90 0"
+                   material="src: #hirofriar"></a-plane>
+          <!-- TOP (+Y) — NCS title/logo -->
+          <a-plane width="1" height="1" position="0 0.5 0" rotation="-90 0 0"
+                   material="src: #hirotitle"></a-plane>
+          <!-- BOTTOM (-Y) -->
+          <a-plane width="1" height="1" position="0 -0.5 0" rotation="90 0 0"
+                   material="src: #hirobottom"></a-plane>
+        </a-entity>
       </a-marker>
+
       <a-entity camera></a-entity>
     </a-scene>
   </body>
