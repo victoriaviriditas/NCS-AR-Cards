@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <!-- A-Frame + AR.js -->
     <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
-    <!-- ✅ Updated AR.js URL -->
+    <!-- Updated AR.js URL -->
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
     <style>
       body { margin:0; overflow:hidden; }
@@ -50,8 +50,10 @@
           this.vel.x = dx; this.vel.y = dy; this.rotateBy(dx, dy);
         },
         onUp: function () { this.dragging = false; this.prev = null; },
-        rotateBy: function (dx, dy) {
-          const rot = this.el.getAttribute('rotation'); rot.y += dx * this.data.sensitivity; rot.x += dy * this.data.sensitivity;
+        rotateBy: function (dx, dy) {false* dy.this.rotateby* const dx 
+          Attribute(rotation)  data.sensitivity; preventDefault
+         getPoint                             
+          const rot = this.el.getAttribute('rotation'); rot.y += dx * t  his.data.sensitivity; rot.x += dy * this.data.sensitivity;
           this.el.setAttribute('rotation', rot);
         },
         tick: function (time, dt) {
